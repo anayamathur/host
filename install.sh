@@ -1,72 +1,79 @@
 #!/bin/bash
 
-###############################################################################
-# RAJ-HOST Universal Installer
-# Automatically downloads and installs raj-host command globally
-###############################################################################
+# RAJ-HOST Bootstrap Installer
+# This creates a global command that auto-downloads and runs raj-host
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+INSTALL_DIR="/usr/local/bin"
+COMMAND_NAME="raj-host"
+SCRIPT_URL="https://raw.githubusercontent.com/anayamathur/host/main/raj-host"
 
-echo -e "${CYAN}"
+echo -e "\033[0;36m"
 echo "╔═══════════════════════════════════════════════════════════╗"
-echo "║              RAJ-HOST Universal Installer                 ║"
-echo "║     Complete Web Server & Virtual Host Management         ║"
+echo "║           RAJ-HOST Bootstrap Installer                    ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
-echo -e "${NC}"
-echo ""
+echo -e "\033[0m"
+
+if [ "$EUID" -ne 0 ]; then 
+    echo -e "\033[0;31mError: Please run with sudo\033[0m"
+    echo "Usage: curl -s https://raw.githubusercontent.com/anayamathur/host/main/install.sh | sudo bash"
+    exit 1
+fi
+
+echo -e "\033[1;33mCreating raj-host command...\033[0m"
+
+# Create the wrapper script
+cat > "$INSTALL_DIR/$COMMAND_NAME" << 'WRAPPER'
+#!/bin/bash
+
+# RAJ-HOST Auto-Downloader Wrapper
+CACHE_DIR="/tmp/raj-host-cache"
+SCRIPT_FILE="$CACHE_DIR/raj-host-main.sh"
+SCRIPT_URL="https://raw.githubusercontent.com/anayamathur/host/main/raj-host"
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then 
-    echo -e "${RED}Error: Please run as root or using sudo${NC}"
-    echo "Usage: sudo bash install.sh"
+    echo -e "\033[0;31mError: raj-host requires sudo/root privileges\033[0m"
+    echo "Usage: sudo raj-host"
     exit 1
 fi
 
-# Determine script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Create cache directory
+mkdir -p "$CACHE_DIR"
 
-echo -e "${YELLOW}Installing raj-host to /usr/local/bin...${NC}"
-
-# Check if raj-host exists in current directory
-if [ -f "$SCRIPT_DIR/raj-host" ]; then
-    cp "$SCRIPT_DIR/raj-host" /usr/local/bin/raj-host
-    chmod +x /usr/local/bin/raj-host
-elif [ -f "./raj-host" ]; then
-    cp ./raj-host /usr/local/bin/raj-host
-    chmod +x /usr/local/bin/raj-host
-else
-    echo -e "${RED}Error: raj-host script not found${NC}"
-    exit 1
+# Download latest version (with cache for 5 minutes)
+if [ ! -f "$SCRIPT_FILE" ] || [ $(find "$SCRIPT_FILE" -mmin +5 2>/dev/null | wc -l) -gt 0 ]; then
+    echo -e "\033[1;33mDownloading latest raj-host...\033[0m"
+    curl -fsSL "$SCRIPT_URL" -o "$SCRIPT_FILE" 2>/dev/null
+    
+    if [ $? -ne 0 ]; then
+        echo -e "\033[0;31mError: Failed to download raj-host\033[0m"
+        echo "Please check your internet connection"
+        exit 1
+    fi
+    
+    chmod +x "$SCRIPT_FILE"
 fi
 
-# Verify installation
-if [ -f "/usr/local/bin/raj-host" ]; then
-    echo -e "${GREEN}✓ Installation successful!${NC}"
-    echo ""
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${GREEN}raj-host command is now available globally!${NC}"
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo ""
-    echo -e "${YELLOW}Usage:${NC}"
-    echo -e "  ${GREEN}sudo raj-host${NC}"
-    echo ""
-    echo -e "${YELLOW}Features:${NC}"
-    echo -e "  ✓ Nginx installation & configuration"
-    echo -e "  ✓ PHP-FPM (7.4, 8.0, 8.1, 8.2, 8.3)"
-    echo -e "  ✓ MySQL/MariaDB installation"
-    echo -e "  ✓ SSL/TLS (Let's Encrypt + Custom)"
-    echo -e "  ✓ Virtual host management"
-    echo ""
-    echo -e "${YELLOW}To uninstall:${NC}"
-    echo -e "  ${GREEN}sudo rm /usr/local/bin/raj-host${NC}"
-    echo ""
-    echo -e "${GREEN}Ready to use! Run: ${YELLOW}sudo raj-host${NC}"
-else
-    echo -e "${RED}✗ Installation failed${NC}"
-    exit 1
-fi
+# Run the main script
+bash "$SCRIPT_FILE" "$@"
+WRAPPER
+
+chmod +x "$INSTALL_DIR/$COMMAND_NAME"
+
+echo -e "\033[0;32m✓ Installation successful!\033[0m"
+echo ""
+echo -e "\033[0;36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+echo -e "\033[0;32mraj-host command is now available globally!\033[0m"
+echo -e "\033[0;36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+echo ""
+echo -e "\033[1;33mUsage:\033[0m"
+echo -e "  \033[0;32msudo raj-host\033[0m"
+echo ""
+echo -e "\033[1;33mFeatures:\033[0m"
+echo "  ✓ Auto-downloads latest version"
+echo "  ✓ Nginx + PHP-FPM + MySQL/MariaDB setup"
+echo "  ✓ SSL/TLS support"
+echo "  ✓ Virtual host management"
+echo ""
+echo -e "\033[0;32mReady! Just run: \033[1;33msudo raj-host\033[0m"
+echo ""

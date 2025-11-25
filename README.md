@@ -19,23 +19,39 @@ One command to setup Nginx + PHP-FPM + MySQL/MariaDB virtual hosts on any Linux 
 - 🎨 **Beautiful UI**: Color-coded interactive prompts
 - ✅ **Smart Validation**: Tests configuration before applying
 
-## 🚀 Quick Install
+## 🚀 Installation
 
-### ⚡ One Command - That's All!
+### ⚡ Super Simple - Just One Command!
 
 ```bash
-curl -s https://raw.githubusercontent.com/anayamathur/host/main/raj-host | sudo bash
+curl -s https://raw.githubusercontent.com/anayamathur/host/main/install.sh | sudo bash
 ```
 
-**What this does:**
-1. Downloads the script
-2. Auto-installs to `/usr/local/bin/raj-host`
-3. Makes it available globally
-4. Starts the setup wizard
+**That's it!** This will:
+1. Install `raj-host` command globally
+2. Auto-download the latest version when you run it
+3. No manual downloads or updates needed!
 
-**No git clone, no download, no extraction needed!**
+### 📖 Usage
 
-### Alternative Methods
+After installation, just run:
+
+```bash
+sudo raj-host
+```
+
+The script will:
+- ✓ Auto-download the latest version
+- ✓ Check your system
+- ✓ Install missing components (Nginx, PHP, MySQL)
+- ✓ Help you create virtual hosts
+- ✓ Configure SSL certificates
+
+**Always up-to-date!** Every time you run `raj-host`, it fetches the latest version automatically.
+
+---
+
+### Alternative Installation Methods
 
 <details>
 <summary>Method 2: Git Clone (click to expand)</summary>
@@ -45,6 +61,8 @@ git clone https://github.com/anayamathur/host.git
 cd host
 sudo bash install.sh
 ```
+
+Then run: `sudo raj-host`
 </details>
 
 <details>
@@ -56,6 +74,8 @@ unzip main.zip
 cd host-main
 sudo bash install.sh
 ```
+
+Then run: `sudo raj-host`
 </details>
 
 ## 📖 Usage
