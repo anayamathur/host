@@ -21,49 +21,73 @@ One command to setup Nginx + PHP-FPM + MySQL/MariaDB virtual hosts on any Linux 
 
 ## 🚀 Installation
 
+### ⚡ Quick Install (One Command - Recommended)
+
+**Automatic installation for all platforms:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/anayamathur/host/main/quick-install.sh | sudo bash
+```
+
+This will automatically:
+- ✅ Detect your OS (Ubuntu/Debian/CentOS/RHEL/Fedora)
+- ✅ Setup package repository
+- ✅ Install raj-host
+- ✅ Make `raj-host` command available globally
+
+---
+
+### 📦 Manual Installation Methods
+
 Choose your preferred installation method:
 
-### ⚡ Method 1: Package Manager (Recommended)
+#### Method 1: Package Manager (APT/YUM)
 
-#### Ubuntu / Debian - Direct Package
+**Ubuntu / Debian - Direct Package**
 ```bash
 wget https://github.com/anayamathur/host/releases/download/v1.0.0/raj-host_1.0.0_all.deb
 sudo dpkg -i raj-host_1.0.0_all.deb
 sudo raj-host
 ```
 
-#### Ubuntu / Debian - APT Repository
+**Ubuntu / Debian - APT Repository**
 ```bash
 curl -s https://raw.githubusercontent.com/anayamathur/host/main/debian/setup-apt-repo.sh | sudo bash
 sudo apt update
 sudo apt install raj-host
-sudo raj-host
 ```
 
-#### CentOS / RHEL / Fedora / Rocky / AlmaLinux - Direct Package
+**CentOS / RHEL / Fedora / Rocky / AlmaLinux - Direct Package**
 ```bash
 wget https://github.com/anayamathur/host/releases/download/v1.0.0/raj-host-1.0.0-1.el8.noarch.rpm
 sudo rpm -i raj-host-1.0.0-1.el8.noarch.rpm
-sudo raj-host
 ```
 
-#### CentOS / RHEL / Fedora / Rocky / AlmaLinux - YUM/DNF Repository
+**CentOS / RHEL / Fedora / Rocky / AlmaLinux - YUM/DNF Repository**
 ```bash
 curl -s https://raw.githubusercontent.com/anayamathur/host/main/yum/setup-yum-repo.sh | sudo bash
 sudo yum install raj-host  # or sudo dnf install raj-host
-sudo raj-host
 ```
 
-#### macOS - Homebrew
+#### Method 2: Homebrew (macOS)
 ```bash
 brew tap anayamathur/raj-host https://github.com/anayamathur/host
 brew install raj-host
-sudo raj-host
 ```
+
+#### Method 3: Bootstrap Installer (Legacy)
 
 ### 📖 Usage
 
-After installation, just run:
+#### Method 3: Bootstrap Installer (Legacy)
+```bash
+curl -s https://raw.githubusercontent.com/anayamathur/host/main/install.sh | sudo bash
+```
+
+---
+
+## 💻 Usage
+
+After installation, run:
 
 ```bash
 sudo raj-host
@@ -77,20 +101,10 @@ The interactive wizard will:
 
 ---
 
-### Alternative Installation Methods
+## 📋 Advanced Options
 
 <details>
-<summary>Method 2: One-Line Install (click to expand)</summary>
-
-```bash
-curl -s https://raw.githubusercontent.com/anayamathur/host/main/install.sh | sudo bash
-```
-
-Then run: `sudo raj-host`
-</details>
-
-<details>
-<summary>Method 3: Git Clone (click to expand)</summary>
+<summary>Git Clone Installation (click to expand)</summary>
 
 ```bash
 git clone https://github.com/anayamathur/host.git
