@@ -1,0 +1,9 @@
+Package: raj-host-repo
+Version: 1.0.0
+Section: utils
+Priority: optional
+Architecture: all
+Maintainer: Raj Host Team <support@rajhost.com>
+Description: APT repository configuration for raj-host
+ This package configures the raj-host APT repository on your system.
+ After installation, you can install raj-host with: sudo apt install raj-host
