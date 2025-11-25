@@ -6,11 +6,11 @@
 set -e
 
 REPO_URL="https://anayamathur.github.io/host"
-RELEASE_URL="https://github.com/anayamathur/host/releases/download/v1.0.0"
+RELEASE_URL="https://github.com/anayamathur/host/releases/download/v1.0.1"
 
 echo -e "\033[0;36m"
 echo "╔═══════════════════════════════════════════════════════════╗"
-echo "║           RAJ-HOST Automatic Installer v1.0.0             ║"
+echo "║           RAJ-HOST Automatic Installer v1.0.1             ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo -e "\033[0m"
 
