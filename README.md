@@ -21,16 +21,19 @@ One command to setup Nginx + PHP-FPM + MySQL/MariaDB virtual hosts on any Linux 
 
 ## 🚀 Installation
 
-### ⚡ Super Simple - Just One Command!
+### ⚡ Method 1: Package Installation (Recommended)
 
+#### Ubuntu / Debian
 ```bash
-curl -s https://raw.githubusercontent.com/anayamathur/host/main/install.sh | sudo bash
+wget https://github.com/anayamathur/host/raw/main/raj-host_1.0.0_all.deb
+sudo dpkg -i raj-host_1.0.0_all.deb
 ```
 
-**That's it!** This will:
-1. Install `raj-host` command globally
-2. Auto-download the latest version when you run it
-3. No manual downloads or updates needed!
+#### CentOS / RHEL / Fedora / Rocky / AlmaLinux
+```bash
+wget https://github.com/anayamathur/host/raw/main/raj-host-1.0.0-1.noarch.rpm
+sudo rpm -i raj-host-1.0.0-1.noarch.rpm
+```
 
 ### 📖 Usage
 
@@ -40,21 +43,28 @@ After installation, just run:
 sudo raj-host
 ```
 
-The script will:
-- ✓ Auto-download the latest version
+The interactive wizard will:
 - ✓ Check your system
 - ✓ Install missing components (Nginx, PHP, MySQL)
 - ✓ Help you create virtual hosts
 - ✓ Configure SSL certificates
-
-**Always up-to-date!** Every time you run `raj-host`, it fetches the latest version automatically.
 
 ---
 
 ### Alternative Installation Methods
 
 <details>
-<summary>Method 2: Git Clone (click to expand)</summary>
+<summary>Method 2: One-Line Install (click to expand)</summary>
+
+```bash
+curl -s https://raw.githubusercontent.com/anayamathur/host/main/install.sh | sudo bash
+```
+
+Then run: `sudo raj-host`
+</details>
+
+<details>
+<summary>Method 3: Git Clone (click to expand)</summary>
 
 ```bash
 git clone https://github.com/anayamathur/host.git
@@ -66,7 +76,7 @@ Then run: `sudo raj-host`
 </details>
 
 <details>
-<summary>Method 3: Manual Download (click to expand)</summary>
+<summary>Method 4: Manual Download (click to expand)</summary>
 
 ```bash
 wget https://github.com/anayamathur/host/archive/refs/heads/main.zip
