@@ -2,23 +2,7 @@ Origin: RAJ-HOST Repository
 Label: raj-host
 Suite: stable
 Codename: stable
-Architectures: amd64 all
+Architectures: amd64
 Components: main
-Description: Official RAJ-HOST package repository
-Date: Tue, 25 Nov 2025 12:48:54 +0000
-MD5Sum:
- 06fafd5401ca4f5dfbafb528c35c2d6c              205 Release
- a831879f2d0bdcd20665684b03b8b77a              781 main/binary-amd64/Packages
- 5ee0d0630b0373f9c64904181992bbcc              556 main/binary-amd64/Packages.gz
-SHA1:
- a9f08fe7050b7c47e1ccf7381b5418b37d266ffb              205 Release
- aa0d861a4edb0a0a5005d29d348f106d4d2ec43a              781 main/binary-amd64/Packages
- f52028b9dd6b0d6adc54a558759ca324f544a324              556 main/binary-amd64/Packages.gz
-SHA256:
- 5c900cc986b14eb6524383072b5d4df87a7c4996b7f7f20f51d49c2d3afddb5f              205 Release
- 84cec4f6f5e34497ccaef4290469f11131dc85af18c7948500019523e334884c              781 main/binary-amd64/Packages
- e5d311917dd2c980e32596db294153b6ed19d205fb9043223c8d719a1de26fa3              556 main/binary-amd64/Packages.gz
-SHA512:
- 5ee6a2a2988272eb1d8bceae0c015e5cf1095612ad8fa48413e413a7cfddf3d9ebac6eb2c5f3b18be5037cb2a70da08c49b5165a539b9fca3de32c48859d4393              205 Release
- 9a263938342d11b53ec288594bc3c9df0edce58bac8bf323f06f137ce7abb805b223abb4f968bc6299540ac6efe3e6a6665f85ab4ad6d34e6a09806cba0f551f              781 main/binary-amd64/Packages
- f829105e23bfaef6298303e142100eecbc0aeb4f43fe82837651330211ec28ca6afb441737a1ee2abe225774ed279d7ed6934607455ec91f349e29e9dd8f8524              556 main/binary-amd64/Packages.gz
+Description: RAJ-HOST - Complete Web Server Setup Tool
+Date: Tue, 25 Nov 2025 18:43:55 +0530

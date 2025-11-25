@@ -1,15 +1,9 @@
 Package: raj-host
 Version: 1.0.1
-Architecture: all
-Maintainer: Anaya Mathur <anaya@example.com>
-Depends: bash (>= 4.0), curl
-Filename: pool/main/raj-host_1.0.1_all.deb
-Size: 5400
-MD5sum: b4c75e951714ca5b0674390ec69c1310
-SHA1: fbf000e766466ede22ee0160d0b623f2b9409d97
-SHA256: 9cc6c818881da092442f87a18c7683af9fef16affb35c6422697f8a04f89c851
 Section: utils
 Priority: optional
+Architecture: all
+Maintainer: Anaya Mathur <anaya@example.com>
 Description: Complete Web Server Setup and Virtual Host Management Tool
  RAJ-HOST is an automated tool for setting up Nginx web servers with
  PHP-FPM, MySQL/MariaDB, and managing virtual hosts with SSL support.
@@ -19,4 +13,4 @@ Description: Complete Web Server Setup and Virtual Host Management Tool
   - SSL/TLS support (Let's Encrypt and custom certificates)
   - Automatic detection of Ubuntu, Debian, CentOS, RHEL, Fedora
   - One-command setup for complete LEMP stack
-
+Depends: bash (>= 4.0), curl

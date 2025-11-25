@@ -1,5 +1,5 @@
 Name:           raj-host
-Version:        1.0.0
+Version:        1.0.1
 Release:        1%{?dist}
 Summary:        Complete Web Server & Virtual Host Management Tool
 License:        MIT
@@ -37,7 +37,7 @@ echo "╔═══════════════════════�
 echo "║         RAJ-HOST installed successfully!                  ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo ""
-echo "Usage: sudo raj-host"
+echo "Usage: raj-host"
 echo ""
 echo "Features:"
 echo "  ✓ Nginx installation & configuration"
@@ -48,5 +48,10 @@ echo "  ✓ Virtual host management"
 echo ""
 
 %changelog
+* Mon Nov 25 2024 Raj <raj@example.com> - 1.0.1-1
+- Enable auto-sudo elevation - users can now run 'raj-host' directly without sudo prefix
+- Script automatically re-executes with sudo when needed
+- Updated all documentation to reflect simplified usage
+
 * Mon Nov 25 2024 Raj <raj@example.com> - 1.0.0-1
 - Initial release
