@@ -21,34 +21,42 @@ One command to setup Nginx + PHP-FPM + MySQL/MariaDB virtual hosts on any Linux 
 
 ## 🚀 Quick Install
 
-### Method 1: Download Release
+### ⚡ One Command - That's All!
 
 ```bash
-# Download and extract
+curl -s https://raw.githubusercontent.com/anayamathur/host/main/raj-host | sudo bash
+```
+
+**What this does:**
+1. Downloads the script
+2. Auto-installs to `/usr/local/bin/raj-host`
+3. Makes it available globally
+4. Starts the setup wizard
+
+**No git clone, no download, no extraction needed!**
+
+### Alternative Methods
+
+<details>
+<summary>Method 2: Git Clone (click to expand)</summary>
+
+```bash
+git clone https://github.com/anayamathur/host.git
+cd host
+sudo bash install.sh
+```
+</details>
+
+<details>
+<summary>Method 3: Manual Download (click to expand)</summary>
+
+```bash
 wget https://github.com/anayamathur/host/archive/refs/heads/main.zip
 unzip main.zip
 cd host-main
-
-# Install
 sudo bash install.sh
 ```
-
-### Method 2: Git Clone
-
-```bash
-# Clone repository
-git clone https://github.com/anayamathur/host.git
-cd host
-
-# Install
-sudo bash install.sh
-```
-
-### Method 3: One-Line Install
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/anayamathur/host/main/install.sh | sudo bash
-```
+</details>
 
 ## 📖 Usage
 
