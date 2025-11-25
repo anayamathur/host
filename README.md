@@ -21,18 +21,44 @@ One command to setup Nginx + PHP-FPM + MySQL/MariaDB virtual hosts on any Linux 
 
 ## 🚀 Installation
 
-### ⚡ Method 1: Package Installation (Recommended)
+Choose your preferred installation method:
 
-#### Ubuntu / Debian
+### ⚡ Method 1: Package Manager (Recommended)
+
+#### Ubuntu / Debian - Direct Package
 ```bash
-wget https://github.com/anayamathur/host/raw/main/raj-host_1.0.0_all.deb
+wget https://github.com/anayamathur/host/releases/download/v1.0.0/raj-host_1.0.0_all.deb
 sudo dpkg -i raj-host_1.0.0_all.deb
+sudo raj-host
 ```
 
-#### CentOS / RHEL / Fedora / Rocky / AlmaLinux
+#### Ubuntu / Debian - APT Repository
 ```bash
-wget https://github.com/anayamathur/host/raw/main/raj-host-1.0.0-1.noarch.rpm
-sudo rpm -i raj-host-1.0.0-1.noarch.rpm
+curl -s https://raw.githubusercontent.com/anayamathur/host/main/debian/setup-apt-repo.sh | sudo bash
+sudo apt update
+sudo apt install raj-host
+sudo raj-host
+```
+
+#### CentOS / RHEL / Fedora / Rocky / AlmaLinux - Direct Package
+```bash
+wget https://github.com/anayamathur/host/releases/download/v1.0.0/raj-host-1.0.0-1.el8.noarch.rpm
+sudo rpm -i raj-host-1.0.0-1.el8.noarch.rpm
+sudo raj-host
+```
+
+#### CentOS / RHEL / Fedora / Rocky / AlmaLinux - YUM/DNF Repository
+```bash
+curl -s https://raw.githubusercontent.com/anayamathur/host/main/yum/setup-yum-repo.sh | sudo bash
+sudo yum install raj-host  # or sudo dnf install raj-host
+sudo raj-host
+```
+
+#### macOS - Homebrew
+```bash
+brew tap anayamathur/raj-host https://github.com/anayamathur/host
+brew install raj-host
+sudo raj-host
 ```
 
 ### 📖 Usage
@@ -267,9 +293,50 @@ Logs:      /var/log/nginx/
 User:      nginx
 ```
 
+## 📦 Package Repositories
+
+RAJ-HOST is available through multiple package repositories:
+
+### APT Repository (Ubuntu/Debian)
+- Repository: `https://anayamathur.github.io/host/debian`
+- Setup script: `debian/setup-apt-repo.sh`
+- Packages located in: `debian/pool/main/`
+
+### YUM Repository (CentOS/RHEL/Fedora)
+- Repository: `https://anayamathur.github.io/host/yum/packages`
+- Setup script: `yum/setup-yum-repo.sh`
+- Packages located in: `yum/packages/`
+
+### Homebrew Tap (macOS)
+- Tap URL: `anayamathur/raj-host`
+- Formula: `homebrew/raj-host.rb`
+
+### GitHub Releases
+All packages are also available as direct downloads from:
+- https://github.com/anayamathur/host/releases
+
 ## 🗑️ Uninstall
 
-### Remove raj-host command
+### Remove raj-host package (Ubuntu/Debian)
+```bash
+sudo apt remove raj-host
+# or
+sudo dpkg -r raj-host
+```
+
+### Remove raj-host package (CentOS/RHEL/Fedora)
+```bash
+sudo yum remove raj-host
+# or
+sudo rpm -e raj-host
+```
+
+### Remove raj-host (Homebrew)
+```bash
+brew uninstall raj-host
+```
+
+### Remove raj-host command (manual installation)
 ```bash
 sudo rm /usr/local/bin/raj-host
 ```

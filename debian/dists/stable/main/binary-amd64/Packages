@@ -1,0 +1,22 @@
+Package: raj-host
+Version: 1.0.0
+Architecture: all
+Maintainer: Raj <raj@example.com>
+Depends: curl, bash
+Filename: pool/main/raj-host_1.0.0_all.deb
+Size: 5520
+MD5sum: 6c27e1b7f321ecc18ab8693e0e1d074f
+SHA1: 8113559691b7e7e9cf38488384226991b60147e0
+SHA256: ef16f31202743d54102b651f0b8a5ed3fdc58bb3bf3b5c6594ec9da8bceae95e
+Section: admin
+Priority: optional
+Description: Complete Web Server & Virtual Host Management Tool
+ RAJ-HOST is a powerful script that automates the setup of Nginx,
+ PHP-FPM, MySQL/MariaDB, and virtual hosts on Linux systems.
+ .
+ Features:
+  - Auto-installation of Nginx, PHP-FPM, MySQL/MariaDB
+  - Support for PHP 7.4, 8.0, 8.1, 8.2, 8.3
+  - SSL/TLS with Let's Encrypt or custom certificates
+  - Works on Ubuntu, Debian, CentOS, RHEL, Fedora, Rocky, AlmaLinux
+
