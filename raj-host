@@ -4,8 +4,42 @@
 # RAJ-HOST - Complete Web Server Setup Script
 # Nginx + PHP-FPM + MySQL/MariaDB Virtual Host Management
 # Works on any Linux system (Ubuntu/Debian/CentOS/RHEL/Fedora)
-# Usage: sudo raj-host
+# Usage: bash <(curl -s https://raw.githubusercontent.com/anayamathur/host/main/raj-host)
 ###############################################################################
+
+# Self-install check
+SCRIPT_PATH="/usr/local/bin/raj-host"
+if [ "$1" == "--self-install" ] || [ ! -f "$SCRIPT_PATH" ]; then
+    if [ "$EUID" -ne 0 ]; then
+        echo -e "\033[0;31mError: Installation requires sudo/root privileges\033[0m"
+        echo "Run: curl -s https://raw.githubusercontent.com/anayamathur/host/main/raj-host | sudo bash"
+        exit 1
+    fi
+    
+    if [ ! -f "$SCRIPT_PATH" ]; then
+        echo -e "\033[0;36m"
+        echo "╔═══════════════════════════════════════════════════════════╗"
+        echo "║              RAJ-HOST Quick Installer                     ║"
+        echo "╚═══════════════════════════════════════════════════════════╝"
+        echo -e "\033[0m"
+        
+        echo -e "\033[1;33mInstalling raj-host to $SCRIPT_PATH...\033[0m"
+        
+        # Download and install
+        curl -fsSL https://raw.githubusercontent.com/anayamathur/host/main/raj-host -o "$SCRIPT_PATH"
+        chmod +x "$SCRIPT_PATH"
+        
+        echo -e "\033[0;32m✓ Installation successful!\033[0m"
+        echo ""
+        echo -e "\033[0;32mraj-host command is now available globally!\033[0m"
+        echo ""
+        echo -e "\033[1;33mUsage:\033[0m"
+        echo -e "  \033[0;32msudo raj-host\033[0m"
+        echo ""
+        echo -e "\033[0;32mReady! Run: \033[1;33msudo raj-host\033[0m"
+        exit 0
+    fi
+fi
 
 # Color codes for better output
 RED='\033[0;31m'
@@ -48,133 +82,120 @@ detect_os() {
         . /etc/os-release
         OS=$ID
         OS_VERSION=$VERSION_ID
-    elif [ -f /etc/redhat-release ]; then
-        OS="rhel"
     else
-        OS="unknown"
+        echo -e "${RED}Cannot detect OS. This script supports Ubuntu, Debian, CentOS, RHEL, Fedora${NC}"
+        exit 1
     fi
-
-    case $OS in
+    
+    case "$OS" in
         ubuntu|debian)
-            NGINX_AVAILABLE="/etc/nginx/sites-available"
-            NGINX_ENABLED="/etc/nginx/sites-enabled"
-            WEB_ROOT="/var/www"
-            WEB_USER="www-data"
-            NGINX_SERVICE="nginx"
             PKG_MANAGER="apt-get"
-            ;;
-        centos|rhel|fedora|rocky|almalinux)
-            NGINX_AVAILABLE="/etc/nginx/conf.d"
-            NGINX_ENABLED="/etc/nginx/conf.d"
-            WEB_ROOT="/usr/share/nginx/html"
-            WEB_USER="nginx"
+            PKG_UPDATE="apt-get update"
+            PKG_INSTALL="apt-get install -y"
             NGINX_SERVICE="nginx"
+            PHP_FPM_SERVICE="php-fpm"
+            NGINX_CONF_DIR="/etc/nginx"
+            NGINX_SITES_AVAILABLE="/etc/nginx/sites-available"
+            NGINX_SITES_ENABLED="/etc/nginx/sites-enabled"
+            WEB_ROOT="/var/www"
+            ;;
+        centos|rhel|rocky|almalinux|fedora)
+            PKG_MANAGER="yum"
             if command -v dnf &> /dev/null; then
                 PKG_MANAGER="dnf"
-            else
-                PKG_MANAGER="yum"
             fi
+            PKG_UPDATE="$PKG_MANAGER check-update || true"
+            PKG_INSTALL="$PKG_MANAGER install -y"
+            NGINX_SERVICE="nginx"
+            PHP_FPM_SERVICE="php-fpm"
+            NGINX_CONF_DIR="/etc/nginx"
+            NGINX_SITES_AVAILABLE="/etc/nginx/conf.d"
+            NGINX_SITES_ENABLED="/etc/nginx/conf.d"
+            WEB_ROOT="/usr/share/nginx/html"
             ;;
         *)
             echo -e "${RED}Unsupported OS: $OS${NC}"
             exit 1
             ;;
     esac
-    
-    echo -e "${GREEN}✓ Detected OS: $OS $OS_VERSION${NC}"
 }
 
-# Check and install Nginx
-check_install_nginx() {
-    echo ""
-    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${YELLOW}Checking Nginx...${NC}"
-    
+# Check if Nginx is installed
+check_nginx() {
     if command -v nginx &> /dev/null; then
-        NGINX_VER=$(nginx -v 2>&1 | grep -oP '(?<=nginx/)[0-9.]+')
-        echo -e "${GREEN}✓ Nginx is already installed (version: $NGINX_VER)${NC}"
+        echo -e "${GREEN}✓ Nginx is already installed ($(nginx -v 2>&1 | cut -d'/' -f2))${NC}"
+        return 0
     else
-        echo -e "${YELLOW}Nginx is not installed.${NC}"
-        echo -e "${YELLOW}Do you want to install Nginx? (y/n) [default: y]:${NC} "
-        read -r install_nginx
-        install_nginx=${install_nginx:-y}
-        
-        if [[ "$install_nginx" == "y" || "$install_nginx" == "Y" ]]; then
-            INSTALL_NGINX=true
-            install_nginx_package
-        else
-            echo -e "${RED}Nginx is required. Exiting...${NC}"
-            exit 1
-        fi
+        echo -e "${YELLOW}! Nginx is not installed${NC}"
+        return 1
     fi
 }
 
-# Install Nginx based on OS
-install_nginx_package() {
+# Check if PHP-FPM is installed
+check_php() {
+    if command -v php &> /dev/null; then
+        PHP_CURRENT=$(php -v | head -n 1 | cut -d' ' -f2 | cut -d'.' -f1,2)
+        echo -e "${GREEN}✓ PHP is already installed (v$PHP_CURRENT)${NC}"
+        return 0
+    else
+        echo -e "${YELLOW}! PHP is not installed${NC}"
+        return 1
+    fi
+}
+
+# Check if MySQL/MariaDB is installed
+check_mysql() {
+    if command -v mysql &> /dev/null; then
+        if mysql -V | grep -q "MariaDB"; then
+            MYSQL_CURRENT="MariaDB $(mysql -V | grep -oP '\d+\.\d+\.\d+')"
+        else
+            MYSQL_CURRENT="MySQL $(mysql -V | grep -oP '\d+\.\d+\.\d+')"
+        fi
+        echo -e "${GREEN}✓ Database is already installed ($MYSQL_CURRENT)${NC}"
+        return 0
+    else
+        echo -e "${YELLOW}! MySQL/MariaDB is not installed${NC}"
+        return 1
+    fi
+}
+
+# Install Nginx
+install_nginx() {
     echo -e "${YELLOW}Installing Nginx...${NC}"
     
-    case $OS in
+    case "$OS" in
         ubuntu|debian)
-            apt-get update -qq
-            apt-get install -y nginx
+            $PKG_UPDATE
+            $PKG_INSTALL nginx
             ;;
-        centos|rhel|rocky|almalinux)
-            $PKG_MANAGER install -y nginx
-            ;;
-        fedora)
-            dnf install -y nginx
+        centos|rhel|rocky|almalinux|fedora)
+            $PKG_INSTALL epel-release
+            $PKG_INSTALL nginx
             ;;
     esac
     
-    systemctl enable $NGINX_SERVICE
-    systemctl start $NGINX_SERVICE
+    systemctl enable nginx
+    systemctl start nginx
     
-    NGINX_VER=$(nginx -v 2>&1 | grep -oP '(?<=nginx/)[0-9.]+')
-    echo -e "${GREEN}✓ Nginx $NGINX_VER installed successfully${NC}"
-}
-
-# Check and install PHP-FPM
-check_install_php() {
-    echo ""
-    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${YELLOW}Checking PHP-FPM...${NC}"
-    
-    if command -v php &> /dev/null; then
-        PHP_INSTALLED_VER=$(php -v | head -n 1 | grep -oP '(?<=PHP )[0-9.]+')
-        echo -e "${GREEN}✓ PHP is already installed (version: $PHP_INSTALLED_VER)${NC}"
-        PHP_VERSION=$PHP_INSTALLED_VER
+    if systemctl is-active --quiet nginx; then
+        echo -e "${GREEN}✓ Nginx installed and started successfully${NC}"
     else
-        echo -e "${YELLOW}PHP is not installed.${NC}"
-    fi
-    
-    echo -e "${YELLOW}Do you want to install/use PHP-FPM for this virtual host? (y/n) [default: n]:${NC} "
-    read -r install_php
-    install_php=${install_php:-n}
-    
-    if [[ "$install_php" == "y" || "$install_php" == "Y" ]]; then
-        INSTALL_PHP=true
-        
-        if ! command -v php &> /dev/null; then
-            select_php_version
-            install_php_package
-        fi
-    else
-        echo -e "${CYAN}→ Skipping PHP installation${NC}"
+        echo -e "${RED}✗ Failed to start Nginx${NC}"
+        exit 1
     fi
 }
 
-# Select PHP version
-select_php_version() {
-    echo ""
+# Install PHP-FPM
+install_php() {
     echo -e "${YELLOW}Select PHP version to install:${NC}"
     echo "1) PHP 7.4"
     echo "2) PHP 8.0"
     echo "3) PHP 8.1"
-    echo "4) PHP 8.2"
+    echo "4) PHP 8.2 (Recommended)"
     echo "5) PHP 8.3 (Latest)"
-    echo -e "${YELLOW}Enter choice [1-5] [default: 5]:${NC} "
-    read -r php_choice
-    php_choice=${php_choice:-5}
+    echo "6) Skip PHP installation"
+    
+    read -p "Enter choice [1-6]: " php_choice
     
     case $php_choice in
         1) PHP_VERSION="7.4" ;;
@@ -182,704 +203,431 @@ select_php_version() {
         3) PHP_VERSION="8.1" ;;
         4) PHP_VERSION="8.2" ;;
         5) PHP_VERSION="8.3" ;;
-        *) PHP_VERSION="8.3" ;;
+        6) 
+            echo -e "${CYAN}Skipping PHP installation${NC}"
+            return 0
+            ;;
+        *)
+            echo -e "${RED}Invalid choice. Skipping PHP installation${NC}"
+            return 1
+            ;;
     esac
     
-    echo -e "${GREEN}→ Selected PHP $PHP_VERSION${NC}"
-}
-
-# Install PHP-FPM based on OS
-install_php_package() {
-    echo -e "${YELLOW}Installing PHP $PHP_VERSION and PHP-FPM...${NC}"
+    echo -e "${YELLOW}Installing PHP $PHP_VERSION with FPM...${NC}"
     
-    case $OS in
+    case "$OS" in
         ubuntu|debian)
-            # Add PPA for different PHP versions
-            apt-get install -y software-properties-common
-            add-apt-repository ppa:ondrej/php -y 2>/dev/null || true
-            apt-get update -qq
+            # Add PHP repository
+            $PKG_INSTALL software-properties-common
+            add-apt-repository -y ppa:ondrej/php
+            $PKG_UPDATE
             
             # Install PHP and common extensions
-            apt-get install -y \
-                php${PHP_VERSION}-fpm \
-                php${PHP_VERSION}-cli \
-                php${PHP_VERSION}-common \
-                php${PHP_VERSION}-mysql \
-                php${PHP_VERSION}-xml \
-                php${PHP_VERSION}-curl \
-                php${PHP_VERSION}-gd \
-                php${PHP_VERSION}-mbstring \
-                php${PHP_VERSION}-zip \
-                php${PHP_VERSION}-bcmath \
-                php${PHP_VERSION}-json 2>/dev/null || true
+            $PKG_INSTALL php${PHP_VERSION}-fpm php${PHP_VERSION}-cli php${PHP_VERSION}-mysql \
+                php${PHP_VERSION}-curl php${PHP_VERSION}-gd php${PHP_VERSION}-mbstring \
+                php${PHP_VERSION}-xml php${PHP_VERSION}-zip php${PHP_VERSION}-bcmath \
+                php${PHP_VERSION}-intl php${PHP_VERSION}-soap
             
-            systemctl enable php${PHP_VERSION}-fpm
-            systemctl start php${PHP_VERSION}-fpm
+            PHP_FPM_SERVICE="php${PHP_VERSION}-fpm"
             ;;
             
         centos|rhel|rocky|almalinux|fedora)
-            # Install EPEL and Remi repository
-            $PKG_MANAGER install -y epel-release
-            $PKG_MANAGER install -y https://rpms.remirepo.net/enterprise/remi-release-${OS_VERSION%%.*}.rpm 2>/dev/null || true
-            
-            # Enable PHP version module
-            if command -v dnf &> /dev/null; then
-                dnf module reset php -y
-                dnf module enable php:remi-${PHP_VERSION} -y
+            # Add Remi repository for PHP
+            if [[ "$OS" == "centos" || "$OS" == "rhel" || "$OS" == "rocky" || "$OS" == "almalinux" ]]; then
+                $PKG_INSTALL epel-release
+                $PKG_INSTALL https://rpms.remirepo.net/enterprise/remi-release-${OS_VERSION}.rpm
+                $PKG_MANAGER module reset php -y
+                $PKG_MANAGER module enable php:remi-${PHP_VERSION} -y
             fi
             
-            # Install PHP and extensions
-            $PKG_MANAGER install -y \
-                php \
-                php-fpm \
-                php-cli \
-                php-common \
-                php-mysqlnd \
-                php-xml \
-                php-gd \
-                php-mbstring \
-                php-json
-            
-            systemctl enable php-fpm
-            systemctl start php-fpm
+            # Install PHP and common extensions
+            $PKG_INSTALL php php-fpm php-mysqlnd php-curl php-gd php-mbstring \
+                php-xml php-zip php-bcmath php-intl php-soap php-cli
             ;;
     esac
     
-    echo -e "${GREEN}✓ PHP $PHP_VERSION installed successfully${NC}"
-}
-
-# Check and install MySQL/MariaDB
-check_install_mysql() {
-    echo ""
-    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${YELLOW}Checking Database Server...${NC}"
+    systemctl enable $PHP_FPM_SERVICE
+    systemctl start $PHP_FPM_SERVICE
     
-    if command -v mysql &> /dev/null; then
-        MYSQL_VER=$(mysql --version | grep -oP '(?<=Distrib )[0-9.]+')
-        echo -e "${GREEN}✓ MySQL/MariaDB is already installed (version: $MYSQL_VER)${NC}"
+    if systemctl is-active --quiet $PHP_FPM_SERVICE; then
+        echo -e "${GREEN}✓ PHP $PHP_VERSION with FPM installed successfully${NC}"
     else
-        echo -e "${YELLOW}MySQL/MariaDB is not installed.${NC}"
-        echo -e "${YELLOW}Do you want to install a database server? (y/n) [default: n]:${NC} "
-        read -r install_db
-        install_db=${install_db:-n}
-        
-        if [[ "$install_db" == "y" || "$install_db" == "Y" ]]; then
-            INSTALL_MYSQL=true
-            select_mysql_type
-            install_mysql_package
-        else
-            echo -e "${CYAN}→ Skipping database installation${NC}"
-        fi
+        echo -e "${RED}✗ Failed to start PHP-FPM${NC}"
+        exit 1
     fi
 }
 
-# Select MySQL or MariaDB
-select_mysql_type() {
-    echo ""
-    echo -e "${YELLOW}Select database server:${NC}"
+# Install MySQL or MariaDB
+install_mysql() {
+    echo -e "${YELLOW}Select database server to install:${NC}"
     echo "1) MySQL 8.0"
-    echo "2) MariaDB 10.11 (Recommended)"
+    echo "2) MariaDB 10.11 (Stable)"
     echo "3) MariaDB 11.0 (Latest)"
-    echo -e "${YELLOW}Enter choice [1-3] [default: 2]:${NC} "
-    read -r db_choice
-    db_choice=${db_choice:-2}
+    echo "4) Skip database installation"
+    
+    read -p "Enter choice [1-4]: " db_choice
     
     case $db_choice in
         1) MYSQL_TYPE="mysql" ;;
         2) MYSQL_TYPE="mariadb-10.11" ;;
         3) MYSQL_TYPE="mariadb-11.0" ;;
-        *) MYSQL_TYPE="mariadb-10.11" ;;
-    esac
-    
-    echo -e "${GREEN}→ Selected $MYSQL_TYPE${NC}"
-}
-
-# Install MySQL/MariaDB
-install_mysql_package() {
-    echo -e "${YELLOW}Installing $MYSQL_TYPE...${NC}"
-    
-    case $OS in
-        ubuntu|debian)
-            apt-get update -qq
-            if [[ "$MYSQL_TYPE" == "mysql" ]]; then
-                apt-get install -y mysql-server mysql-client
-            else
-                apt-get install -y mariadb-server mariadb-client
-            fi
-            systemctl enable mysql 2>/dev/null || systemctl enable mariadb
-            systemctl start mysql 2>/dev/null || systemctl start mariadb
+        4)
+            echo -e "${CYAN}Skipping database installation${NC}"
+            return 0
             ;;
-            
-        centos|rhel|rocky|almalinux|fedora)
-            if [[ "$MYSQL_TYPE" == "mysql" ]]; then
-                $PKG_MANAGER install -y mysql-server mysql
-            else
-                $PKG_MANAGER install -y mariadb-server mariadb
-            fi
-            systemctl enable mysqld 2>/dev/null || systemctl enable mariadb
-            systemctl start mysqld 2>/dev/null || systemctl start mariadb
+        *)
+            echo -e "${RED}Invalid choice. Skipping database installation${NC}"
+            return 1
             ;;
     esac
     
-    echo -e "${GREEN}✓ $MYSQL_TYPE installed successfully${NC}"
-    echo ""
-    echo -e "${YELLOW}⚠ Important: Run 'mysql_secure_installation' to secure your database${NC}"
-}
-
-# Get user inputs for virtual host
-get_user_inputs() {
-    echo ""
-    echo -e "${BLUE}╔═══════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║          Virtual Host Configuration                      ║${NC}"
-    echo -e "${BLUE}╚═══════════════════════════════════════════════════════════╝${NC}"
-    echo ""
-    
-    # Domain name
-    while true; do
-        echo -e "${YELLOW}Enter domain name (e.g., example.com):${NC} "
-        read -r DOMAIN_NAME
-        if [[ -z "$DOMAIN_NAME" ]]; then
-            echo -e "${RED}Domain name cannot be empty!${NC}"
-        else
-            break
-        fi
-    done
-    
-    # Server aliases (www, etc.)
-    echo -e "${YELLOW}Add www subdomain? (y/n) [default: y]:${NC} "
-    read -r add_www
-    add_www=${add_www:-y}
-    if [[ "$add_www" == "y" || "$add_www" == "Y" ]]; then
-        SERVER_ALIAS="www.$DOMAIN_NAME"
-    else
-        SERVER_ALIAS=""
-    fi
-    
-    # Document root
-    DEFAULT_ROOT="$WEB_ROOT/$DOMAIN_NAME"
-    echo -e "${YELLOW}Enter document root path [default: $DEFAULT_ROOT]:${NC} "
-    read -r DOCUMENT_ROOT
-    DOCUMENT_ROOT=${DOCUMENT_ROOT:-$DEFAULT_ROOT}
-    
-    # Port
-    echo -e "${YELLOW}Enter port number [default: 80]:${NC} "
-    read -r PORT
-    PORT=${PORT:-80}
-    
-    # SSL setup
-    echo -e "${YELLOW}Setup SSL/HTTPS? (y/n) [default: n]:${NC} "
-    read -r setup_ssl
-    SETUP_SSL=${setup_ssl:-n}
-    
-    if [[ "$SETUP_SSL" == "y" || "$SETUP_SSL" == "Y" ]]; then
-        echo -e "${YELLOW}Choose SSL option:${NC}"
-        echo "1) Let's Encrypt (Automatic - Recommended)"
-        echo "2) Custom SSL Certificate (Manual)"
-        echo -e "${YELLOW}Enter choice [1-2]:${NC} "
-        read -r ssl_choice
-        SSL_CHOICE=${ssl_choice:-1}
+    if [ "$MYSQL_TYPE" == "mysql" ]; then
+        echo -e "${YELLOW}Installing MySQL 8.0...${NC}"
         
-        if [[ "$SSL_CHOICE" == "2" ]]; then
-            echo -e "${YELLOW}Enter SSL certificate path:${NC} "
-            read -r SSL_CERT
-            echo -e "${YELLOW}Enter SSL certificate key path:${NC} "
-            read -r SSL_KEY
-        fi
-    fi
-    
-    # Access log
-    echo -e "${YELLOW}Enable access log? (y/n) [default: y]:${NC} "
-    read -r enable_log
-    ENABLE_LOG=${enable_log:-y}
-    
-    # Index files
-    INDEX_FILES="index.html index.htm"
-    if [[ "$INSTALL_PHP" == true ]]; then
-        INDEX_FILES="index.php $INDEX_FILES"
+        case "$OS" in
+            ubuntu|debian)
+                $PKG_UPDATE
+                $PKG_INSTALL mysql-server
+                ;;
+            centos|rhel|rocky|almalinux|fedora)
+                $PKG_INSTALL mysql-server
+                ;;
+        esac
+        
+        systemctl enable mysqld || systemctl enable mysql
+        systemctl start mysqld || systemctl start mysql
+        
+        echo -e "${GREEN}✓ MySQL installed successfully${NC}"
+        echo -e "${YELLOW}Note: Run 'mysql_secure_installation' to secure your MySQL installation${NC}"
+        
+    else
+        echo -e "${YELLOW}Installing MariaDB ${MYSQL_TYPE#mariadb-}...${NC}"
+        
+        case "$OS" in
+            ubuntu|debian)
+                $PKG_UPDATE
+                $PKG_INSTALL mariadb-server mariadb-client
+                ;;
+            centos|rhel|rocky|almalinux|fedora)
+                $PKG_INSTALL mariadb-server mariadb
+                ;;
+        esac
+        
+        systemctl enable mariadb
+        systemctl start mariadb
+        
+        echo -e "${GREEN}✓ MariaDB installed successfully${NC}"
+        echo -e "${YELLOW}Note: Run 'mysql_secure_installation' to secure your MariaDB installation${NC}"
     fi
 }
 
-# Create directory structure
-create_directories() {
+# Create virtual host configuration
+create_vhost() {
     echo ""
-    echo -e "${BLUE}Creating directory structure...${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${CYAN}           Virtual Host Configuration${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
-    # Create document root
-    mkdir -p "$DOCUMENT_ROOT"
+    # Get domain name
+    read -p "Enter domain name (e.g., example.com): " domain
+    if [ -z "$domain" ]; then
+        echo -e "${RED}Domain name cannot be empty${NC}"
+        exit 1
+    fi
     
-    # Create logs directory
-    mkdir -p "/var/log/nginx/$DOMAIN_NAME"
+    # Setup directory
+    SITE_ROOT="$WEB_ROOT/$domain"
+    
+    # Ask if PHP is needed
+    USE_PHP=false
+    if command -v php &> /dev/null; then
+        read -p "Enable PHP for this site? (y/n): " enable_php
+        if [[ "$enable_php" =~ ^[Yy]$ ]]; then
+            USE_PHP=true
+        fi
+    fi
+    
+    # Ask about SSL
+    echo ""
+    echo -e "${YELLOW}SSL/TLS Configuration:${NC}"
+    echo "1) No SSL (HTTP only)"
+    echo "2) Let's Encrypt (Free SSL - Auto)"
+    echo "3) Custom SSL Certificate"
+    read -p "Enter choice [1-3]: " ssl_choice
+    
+    # Create directory structure
+    echo -e "${YELLOW}Creating directory structure...${NC}"
+    mkdir -p "$SITE_ROOT"
+    mkdir -p "$SITE_ROOT/public_html"
+    mkdir -p "$SITE_ROOT/logs"
+    
+    # Create index file
+    if [ "$USE_PHP" = true ]; then
+        cat > "$SITE_ROOT/public_html/index.php" <<EOF
+<?php
+phpinfo();
+?>
+EOF
+        echo -e "${GREEN}✓ Created PHP info page${NC}"
+    else
+        cat > "$SITE_ROOT/public_html/index.html" <<EOF
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Welcome to $domain</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 50px; text-align: center; }
+        h1 { color: #333; }
+        p { color: #666; }
+    </style>
+</head>
+<body>
+    <h1>Welcome to $domain</h1>
+    <p>Your virtual host is working correctly!</p>
+    <p>This page is located at: $SITE_ROOT/public_html/index.html</p>
+</body>
+</html>
+EOF
+        echo -e "${GREEN}✓ Created default index.html${NC}"
+    fi
     
     # Set permissions
-    chown -R $WEB_USER:$WEB_USER "$DOCUMENT_ROOT"
-    chmod -R 755 "$DOCUMENT_ROOT"
+    chown -R www-data:www-data "$SITE_ROOT" 2>/dev/null || chown -R nginx:nginx "$SITE_ROOT"
+    chmod -R 755 "$SITE_ROOT"
     
-    # Create sites-enabled directory if it doesn't exist (for Debian/Ubuntu)
-    if [[ "$OS" == "ubuntu" || "$OS" == "debian" ]]; then
-        mkdir -p "$NGINX_ENABLED"
-    fi
+    # Create Nginx configuration
+    CONF_FILE="$NGINX_SITES_AVAILABLE/$domain.conf"
     
-    echo -e "${GREEN}✓ Directories created${NC}"
-}
-
-# Create sample index file
-create_index_file() {
-    if [[ "$INSTALL_PHP" == true ]]; then
-        # Create PHP info page
-        cat > "$DOCUMENT_ROOT/index.php" << 'EOF'
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RAJ-HOST - Setup Complete</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 900px;
-            margin: 50px auto;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        .container {
-            background: white;
-            padding: 40px;
-            border-radius: 15px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-        }
-        h1 { color: #667eea; margin-top: 0; }
-        .success { 
-            color: #10b981; 
-            font-size: 64px; 
-            text-align: center;
-            margin: 20px 0;
-        }
-        .info-box {
-            background: #f3f4f6;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
-            border-left: 4px solid #667eea;
-        }
-        .info-box strong { color: #667eea; }
-        .php-info {
-            background: #eff6ff;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-        }
-        code {
-            background: #1f2937;
-            color: #10b981;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-family: 'Courier New', monospace;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="success">✓</div>
-        <h1>🎉 Virtual Host Setup Successful!</h1>
-        <h2>Welcome to <?php echo $_SERVER['HTTP_HOST']; ?></h2>
-        
-        <div class="info-box">
-            <strong>Document Root:</strong> <?php echo $_SERVER['DOCUMENT_ROOT']; ?>
-        </div>
-        
-        <div class="info-box">
-            <strong>Server Software:</strong> <?php echo $_SERVER['SERVER_SOFTWARE']; ?>
-        </div>
-        
-        <div class="php-info">
-            <h3>📦 PHP Configuration</h3>
-            <strong>PHP Version:</strong> <?php echo phpversion(); ?><br>
-            <strong>Server API:</strong> <?php echo php_sapi_name(); ?><br>
-            <strong>Memory Limit:</strong> <?php echo ini_get('memory_limit'); ?><br>
-            <strong>Max Upload Size:</strong> <?php echo ini_get('upload_max_filesize'); ?><br>
-            <strong>Max POST Size:</strong> <?php echo ini_get('post_max_size'); ?>
-        </div>
-        
-        <div class="info-box">
-            <strong>Status:</strong> <span style="color: #10b981;">🟢 All systems operational</span>
-        </div>
-        
-        <hr>
-        <p style="text-align: center; color: #6b7280;">
-            <small>Powered by RAJ-HOST | Nginx + PHP-FPM</small>
-        </p>
-    </div>
-</body>
-</html>
-EOF
-        chown $WEB_USER:$WEB_USER "$DOCUMENT_ROOT/index.php"
-        echo -e "${GREEN}✓ Sample index.php created${NC}"
-    else
-        # Create HTML page
-        cat > "$DOCUMENT_ROOT/index.html" << EOF
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to $DOMAIN_NAME</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 800px;
-            margin: 50px auto;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        .container {
-            background: white;
-            padding: 40px;
-            border-radius: 15px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-        }
-        h1 { color: #667eea; }
-        .success { color: #10b981; font-size: 64px; text-align: center; }
-        .info-box {
-            background: #f3f4f6;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
-            border-left: 4px solid #667eea;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="success">✓</div>
-        <h1>Virtual Host Setup Successful!</h1>
-        <h2>Welcome to $DOMAIN_NAME</h2>
-        <p>Your Nginx virtual host is configured and working properly.</p>
-        <div class="info-box">
-            <strong>Document Root:</strong> $DOCUMENT_ROOT<br>
-            <strong>Server:</strong> Nginx on Linux
-        </div>
-        <hr>
-        <p style="text-align: center; color: #6b7280;">
-            <small>Powered by RAJ-HOST</small>
-        </p>
-    </div>
-</body>
-</html>
-EOF
-        chown $WEB_USER:$WEB_USER "$DOCUMENT_ROOT/index.html"
-        echo -e "${GREEN}✓ Sample index.html created${NC}"
-    fi
-}
-
-# Generate Nginx configuration
-generate_nginx_config() {
-    echo ""
-    echo -e "${BLUE}Generating Nginx configuration...${NC}"
-    
-    if [[ "$OS" == "ubuntu" || "$OS" == "debian" ]]; then
-        CONFIG_FILE="$NGINX_AVAILABLE/$DOMAIN_NAME.conf"
-    else
-        CONFIG_FILE="$NGINX_AVAILABLE/$DOMAIN_NAME.conf"
-    fi
-    
-    # Detect PHP-FPM socket
-    if [[ "$INSTALL_PHP" == true ]]; then
-        if [[ "$OS" == "ubuntu" || "$OS" == "debian" ]]; then
-            PHP_SOCKET="/var/run/php/php${PHP_VERSION}-fpm.sock"
-        else
-            PHP_SOCKET="/var/run/php-fpm/www.sock"
-        fi
-    fi
-    
-    # Start building config
-    cat > "$CONFIG_FILE" << EOF
-# Virtual Host configuration for $DOMAIN_NAME
-# Generated by RAJ-HOST on $(date)
-
+    if [ "$ssl_choice" == "1" ]; then
+        # HTTP only configuration
+        cat > "$CONF_FILE" <<EOF
 server {
-    listen $PORT;
-    listen [::]:$PORT;
+    listen 80;
+    listen [::]:80;
     
-    server_name $DOMAIN_NAME${SERVER_ALIAS:+ $SERVER_ALIAS};
+    server_name $domain www.$domain;
+    root $SITE_ROOT/public_html;
+    index index.html index.htm$([ "$USE_PHP" = true ] && echo " index.php");
     
-    root $DOCUMENT_ROOT;
-    index $INDEX_FILES;
+    access_log $SITE_ROOT/logs/access.log;
+    error_log $SITE_ROOT/logs/error.log;
     
-    # Logging
-EOF
-
-    if [[ "$ENABLE_LOG" == "y" || "$ENABLE_LOG" == "Y" ]]; then
-        cat >> "$CONFIG_FILE" << EOF
-    access_log /var/log/nginx/$DOMAIN_NAME/access.log;
-    error_log /var/log/nginx/$DOMAIN_NAME/error.log;
-EOF
-    else
-        cat >> "$CONFIG_FILE" << EOF
-    access_log off;
-    error_log /var/log/nginx/$DOMAIN_NAME/error.log;
-EOF
-    fi
-
-    cat >> "$CONFIG_FILE" << EOF
-    
-    # Main location
     location / {
         try_files \$uri \$uri/ =404;
     }
 EOF
 
-    # Add PHP configuration if enabled
-    if [[ "$INSTALL_PHP" == true ]]; then
-        cat >> "$CONFIG_FILE" << EOF
+        if [ "$USE_PHP" = true ]; then
+            PHP_SOCK=$(find /var/run -name "php*.sock" 2>/dev/null | head -n 1)
+            if [ -z "$PHP_SOCK" ]; then
+                PHP_SOCK="/run/php/php-fpm.sock"
+            fi
+            
+            cat >> "$CONF_FILE" <<EOF
     
-    # PHP processing
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:$PHP_SOCKET;
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-        include fastcgi_params;
+        fastcgi_pass unix:$PHP_SOCK;
     }
-EOF
-    fi
-
-    cat >> "$CONFIG_FILE" << EOF
     
-    # Deny access to hidden files
-    location ~ /\. {
+    location ~ /\.ht {
         deny all;
     }
+EOF
+        fi
+        
+        echo "}" >> "$CONF_FILE"
+        
+    elif [ "$ssl_choice" == "2" ]; then
+        # Let's Encrypt SSL
+        if ! command -v certbot &> /dev/null; then
+            echo -e "${YELLOW}Installing Certbot...${NC}"
+            case "$OS" in
+                ubuntu|debian)
+                    $PKG_INSTALL certbot python3-certbot-nginx
+                    ;;
+                centos|rhel|rocky|almalinux|fedora)
+                    $PKG_INSTALL certbot python3-certbot-nginx
+                    ;;
+            esac
+        fi
+        
+        # Create temporary HTTP config for verification
+        cat > "$CONF_FILE" <<EOF
+server {
+    listen 80;
+    listen [::]:80;
     
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
+    server_name $domain www.$domain;
+    root $SITE_ROOT/public_html;
     
-    # Gzip compression
-    gzip on;
-    gzip_vary on;
-    gzip_proxied any;
-    gzip_comp_level 6;
-    gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss application/rss+xml font/truetype font/opentype application/vnd.ms-fontobject image/svg+xml;
+    location ~ /.well-known {
+        allow all;
+    }
 }
 EOF
-
-    echo -e "${GREEN}✓ Nginx configuration created: $CONFIG_FILE${NC}"
+        
+        # Enable site
+        if [ "$NGINX_SITES_AVAILABLE" != "$NGINX_SITES_ENABLED" ]; then
+            ln -sf "$CONF_FILE" "$NGINX_SITES_ENABLED/$domain.conf"
+        fi
+        
+        # Test and reload Nginx
+        nginx -t && systemctl reload nginx
+        
+        # Get SSL certificate
+        read -p "Enter email for Let's Encrypt notifications: " email
+        certbot --nginx -d $domain -d www.$domain --non-interactive --agree-tos -m $email
+        
+        echo -e "${GREEN}✓ SSL certificate installed via Let's Encrypt${NC}"
+        
+    elif [ "$ssl_choice" == "3" ]; then
+        # Custom SSL
+        read -p "Enter path to SSL certificate file: " cert_path
+        read -p "Enter path to SSL private key file: " key_path
+        
+        if [ ! -f "$cert_path" ] || [ ! -f "$key_path" ]; then
+            echo -e "${RED}SSL files not found. Creating HTTP-only configuration${NC}"
+            ssl_choice="1"
+        else
+            cat > "$CONF_FILE" <<EOF
+server {
+    listen 80;
+    listen [::]:80;
+    
+    server_name $domain www.$domain;
+    return 301 https://\$server_name\$request_uri;
 }
 
-# Enable site (for Debian/Ubuntu)
-enable_site() {
-    if [[ "$OS" == "ubuntu" || "$OS" == "debian" ]]; then
-        echo ""
-        echo -e "${BLUE}Enabling site...${NC}"
-        ln -sf "$NGINX_AVAILABLE/$DOMAIN_NAME.conf" "$NGINX_ENABLED/$DOMAIN_NAME.conf"
-        echo -e "${GREEN}✓ Site enabled${NC}"
-    fi
-}
-
-# Setup SSL with Let's Encrypt
-setup_letsencrypt() {
-    echo ""
-    echo -e "${BLUE}Setting up Let's Encrypt SSL...${NC}"
-    
-    # Check if certbot is installed
-    if ! command -v certbot &> /dev/null; then
-        echo -e "${YELLOW}Installing Certbot...${NC}"
-        case $OS in
-            ubuntu|debian)
-                apt-get install -y certbot python3-certbot-nginx
-                ;;
-            centos|rhel|fedora|rocky|almalinux)
-                $PKG_MANAGER install -y certbot python3-certbot-nginx
-                ;;
-        esac
-    fi
-    
-    # Get SSL certificate
-    echo -e "${YELLOW}Enter email for SSL certificate:${NC} "
-    read -r ssl_email
-    
-    certbot --nginx -d "$DOMAIN_NAME" ${SERVER_ALIAS:+-d $SERVER_ALIAS} --non-interactive --agree-tos -m "$ssl_email"
-    
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✓ SSL certificate installed successfully${NC}"
-    else
-        echo -e "${RED}✗ SSL certificate installation failed${NC}"
-        echo -e "${YELLOW}Please ensure:${NC}"
-        echo -e "  1. Domain points to this server"
-        echo -e "  2. Port 80 is accessible from internet"
-    fi
-}
-
-# Setup custom SSL
-setup_custom_ssl() {
-    echo ""
-    echo -e "${BLUE}Configuring custom SSL...${NC}"
-    
-    # Add SSL server block
-    cat >> "$CONFIG_FILE" << EOF
-
-# SSL Configuration
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
     
-    server_name $DOMAIN_NAME${SERVER_ALIAS:+ $SERVER_ALIAS};
+    server_name $domain www.$domain;
+    root $SITE_ROOT/public_html;
+    index index.html index.htm$([ "$USE_PHP" = true ] && echo " index.php");
     
-    ssl_certificate $SSL_CERT;
-    ssl_certificate_key $SSL_KEY;
-    
+    ssl_certificate $cert_path;
+    ssl_certificate_key $key_path;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
     
-    root $DOCUMENT_ROOT;
-    index $INDEX_FILES;
-    
-    access_log /var/log/nginx/$DOMAIN_NAME/ssl-access.log;
-    error_log /var/log/nginx/$DOMAIN_NAME/ssl-error.log;
+    access_log $SITE_ROOT/logs/access.log;
+    error_log $SITE_ROOT/logs/error.log;
     
     location / {
         try_files \$uri \$uri/ =404;
     }
-}
 EOF
-    
-    echo -e "${GREEN}✓ Custom SSL configured${NC}"
-}
 
-# Test Nginx configuration
-test_nginx_config() {
-    echo ""
-    echo -e "${BLUE}Testing Nginx configuration...${NC}"
+            if [ "$USE_PHP" = true ]; then
+                PHP_SOCK=$(find /var/run -name "php*.sock" 2>/dev/null | head -n 1)
+                if [ -z "$PHP_SOCK" ]; then
+                    PHP_SOCK="/run/php/php-fpm.sock"
+                fi
+                
+                cat >> "$CONF_FILE" <<EOF
     
-    if nginx -t 2>&1 | grep -q "successful"; then
-        echo -e "${GREEN}✓ Nginx configuration test passed${NC}"
-        return 0
-    else
-        echo -e "${RED}✗ Nginx configuration test failed${NC}"
-        nginx -t
-        return 1
-    fi
-}
-
-# Reload Nginx
-reload_nginx() {
-    echo ""
-    echo -e "${BLUE}Reloading Nginx...${NC}"
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:$PHP_SOCK;
+    }
     
-    systemctl reload $NGINX_SERVICE
-    
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✓ Nginx reloaded successfully${NC}"
-    else
-        echo -e "${RED}✗ Failed to reload Nginx${NC}"
-        systemctl restart $NGINX_SERVICE
-    fi
-}
-
-# Display summary
-display_summary() {
-    echo ""
-    echo -e "${GREEN}╔═══════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║            🎉 Setup Complete Successfully! 🎉             ║${NC}"
-    echo -e "${GREEN}╚═══════════════════════════════════════════════════════════╝${NC}"
-    echo ""
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${YELLOW}Configuration Summary:${NC}"
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${GREEN}Domain:${NC}          $DOMAIN_NAME${SERVER_ALIAS:+ (www.$DOMAIN_NAME)}"
-    echo -e "${GREEN}Document Root:${NC}   $DOCUMENT_ROOT"
-    echo -e "${GREEN}Port:${NC}            $PORT"
-    echo -e "${GREEN}Config File:${NC}     $CONFIG_FILE"
-    echo -e "${GREEN}Logs:${NC}            /var/log/nginx/$DOMAIN_NAME/"
-    
-    if [[ "$INSTALL_NGINX" == true ]]; then
-        echo -e "${GREEN}Nginx:${NC}           Installed ✓"
-    fi
-    
-    if [[ "$INSTALL_PHP" == true ]]; then
-        echo -e "${GREEN}PHP:${NC}             $PHP_VERSION ✓"
-    fi
-    
-    if [[ "$INSTALL_MYSQL" == true ]]; then
-        echo -e "${GREEN}Database:${NC}        $MYSQL_TYPE ✓"
-    fi
-    
-    if [[ "$SETUP_SSL" == "y" || "$SETUP_SSL" == "Y" ]]; then
-        echo -e "${GREEN}SSL:${NC}             Enabled ✓"
-    fi
-    
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo ""
-    echo -e "${YELLOW}Next Steps:${NC}"
-    echo -e "1. Update DNS records to point to this server"
-    echo -e "2. Upload your website files to: ${GREEN}$DOCUMENT_ROOT${NC}"
-    echo -e "3. Visit: ${GREEN}http://$DOMAIN_NAME${NC}"
-    
-    if [[ "$INSTALL_MYSQL" == true ]]; then
-        echo -e "4. Secure MySQL: ${GREEN}mysql_secure_installation${NC}"
-    fi
-    
-    echo ""
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${YELLOW}Useful Commands:${NC}"
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "  View logs:      ${GREEN}tail -f /var/log/nginx/$DOMAIN_NAME/access.log${NC}"
-    echo -e "  Edit config:    ${GREEN}nano $CONFIG_FILE${NC}"
-    echo -e "  Test config:    ${GREEN}nginx -t${NC}"
-    echo -e "  Reload Nginx:   ${GREEN}systemctl reload nginx${NC}"
-    echo -e "  Remove vhost:   ${GREEN}rm $CONFIG_FILE && systemctl reload nginx${NC}"
-    
-    if [[ "$INSTALL_PHP" == true ]]; then
-        echo -e "  PHP Info:       ${GREEN}php -v${NC}"
-        echo -e "  PHP-FPM:        ${GREEN}systemctl status php${PHP_VERSION}-fpm${NC}"
-    fi
-    
-    if [[ "$INSTALL_MYSQL" == true ]]; then
-        echo -e "  MySQL Login:    ${GREEN}mysql -u root -p${NC}"
-    fi
-    
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo ""
-}
-
-# Main execution
-main() {
-    show_banner
-    detect_os
-    check_install_nginx
-    check_install_php
-    check_install_mysql
-    get_user_inputs
-    create_directories
-    create_index_file
-    generate_nginx_config
-    enable_site
-    
-    # Test configuration before SSL setup
-    if ! test_nginx_config; then
-        echo -e "${RED}Please fix the configuration errors before proceeding${NC}"
-        exit 1
-    fi
-    
-    # Setup SSL if requested
-    if [[ "$SETUP_SSL" == "y" || "$SETUP_SSL" == "Y" ]]; then
-        if [[ "$SSL_CHOICE" == "1" ]]; then
-            reload_nginx
-            setup_letsencrypt
-        else
-            setup_custom_ssl
+    location ~ /\.ht {
+        deny all;
+    }
+EOF
+            fi
+            
+            echo "}" >> "$CONF_FILE"
+            echo -e "${GREEN}✓ Custom SSL configured${NC}"
         fi
     fi
     
-    # Final test and reload
-    if test_nginx_config; then
-        reload_nginx
-        display_summary
+    # Enable site (for Debian/Ubuntu)
+    if [ "$NGINX_SITES_AVAILABLE" != "$NGINX_SITES_ENABLED" ]; then
+        ln -sf "$CONF_FILE" "$NGINX_SITES_ENABLED/$domain.conf"
+    fi
+    
+    # Test Nginx configuration
+    if nginx -t 2>/dev/null; then
+        systemctl reload nginx
+        echo -e "${GREEN}✓ Nginx configuration updated${NC}"
     else
-        echo -e "${RED}Configuration has errors. Please check and fix manually.${NC}"
+        echo -e "${RED}✗ Nginx configuration test failed${NC}"
+        nginx -t
         exit 1
     fi
+    
+    echo ""
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}✓ Virtual host created successfully!${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "${YELLOW}Domain:${NC} $domain"
+    echo -e "${YELLOW}Document Root:${NC} $SITE_ROOT/public_html"
+    echo -e "${YELLOW}Access Log:${NC} $SITE_ROOT/logs/access.log"
+    echo -e "${YELLOW}Error Log:${NC} $SITE_ROOT/logs/error.log"
+    
+    if [ "$ssl_choice" == "1" ]; then
+        echo -e "${YELLOW}URL:${NC} http://$domain"
+    else
+        echo -e "${YELLOW}URL:${NC} https://$domain"
+    fi
+    
+    echo ""
+    echo -e "${CYAN}Note: Make sure your domain's DNS A record points to this server's IP${NC}"
+    echo ""
+}
+
+# Main function
+main() {
+    detect_os
+    show_banner
+    
+    echo -e "${CYAN}Checking system requirements...${NC}"
+    echo ""
+    
+    # Check installations
+    check_nginx
+    NGINX_INSTALLED=$?
+    
+    check_php
+    PHP_INSTALLED=$?
+    
+    check_mysql
+    MYSQL_INSTALLED=$?
+    
+    echo ""
+    
+    # Ask about installations
+    if [ $NGINX_INSTALLED -ne 0 ]; then
+        read -p "Do you want to install Nginx? (y/n): " install_nginx_choice
+        if [[ "$install_nginx_choice" =~ ^[Yy]$ ]]; then
+            install_nginx
+        else
+            echo -e "${RED}Nginx is required to continue. Exiting.${NC}"
+            exit 1
+        fi
+    fi
+    
+    if [ $PHP_INSTALLED -ne 0 ]; then
+        read -p "Do you want to install PHP-FPM? (y/n): " install_php_choice
+        if [[ "$install_php_choice" =~ ^[Yy]$ ]]; then
+            install_php
+        fi
+    fi
+    
+    if [ $MYSQL_INSTALLED -ne 0 ]; then
+        read -p "Do you want to install MySQL/MariaDB? (y/n): " install_mysql_choice
+        if [[ "$install_mysql_choice" =~ ^[Yy]$ ]]; then
+            install_mysql
+        fi
+    fi
+    
+    echo ""
+    # Create virtual host
+    create_vhost
 }
 
 # Run main function
