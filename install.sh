@@ -40,19 +40,19 @@ fi
 # Create cache directory
 mkdir -p "$CACHE_DIR"
 
-# Download latest version (with cache for 5 minutes)
-if [ ! -f "$SCRIPT_FILE" ] || [ $(find "$SCRIPT_FILE" -mmin +5 2>/dev/null | wc -l) -gt 0 ]; then
-    echo -e "\033[1;33mDownloading latest raj-host...\033[0m"
-    curl -fsSL "$SCRIPT_URL" -o "$SCRIPT_FILE" 2>/dev/null
-    
-    if [ $? -ne 0 ]; then
-        echo -e "\033[0;31mError: Failed to download raj-host\033[0m"
-        echo "Please check your internet connection"
-        exit 1
-    fi
-    
-    chmod +x "$SCRIPT_FILE"
+# Always download latest version (no cache for fresh updates)
+echo -e "\033[1;36m⬇ Fetching latest raj-host version...\033[0m"
+curl -fsSL "$SCRIPT_URL" -o "$SCRIPT_FILE" 2>/dev/null
+
+if [ $? -ne 0 ]; then
+    echo -e "\033[0;31m✗ Error: Failed to download raj-host\033[0m"
+    echo "Please check your internet connection"
+    exit 1
 fi
+
+chmod +x "$SCRIPT_FILE"
+echo -e "\033[0;32m✓ Latest version ready!\033[0m"
+echo ""
 
 # Run the main script
 bash "$SCRIPT_FILE" "$@"
